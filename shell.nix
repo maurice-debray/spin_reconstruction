@@ -10,6 +10,7 @@ pkgs.mkShell {
       ps.ipympl
       ps.numba
       ps.matplotlib
+      ps.pandas
       ps.jupyter
       ps.jupyterlab-git
 
