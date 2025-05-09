@@ -1,7 +1,9 @@
 { nixpkgs ? (import ./npins).nixpkgs, pkgs ? import nixpkgs { config.allowUnfree = true; } }:
+
 pkgs.mkShell {
-  nativeBuildInputs = [
+  packages = [
     (pkgs.python3.withPackages (ps: [
+      (ps.callPackage ./npins/mpl-label-lines.nix {})
       ps.numpy
       ps.scipy
       ps.ipython
@@ -13,6 +15,8 @@ pkgs.mkShell {
       ps.pandas
       ps.jupyter
       ps.jupyterlab-git
+      ps.qutip
+
 
       ps.mkdocs
       ps.mkdocs-material
