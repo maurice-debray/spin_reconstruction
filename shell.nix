@@ -22,6 +22,8 @@ pkgs.mkShell {
       ps.qutip
 
 
+      ps.gitpython
+
       ps.mkdocs
       ps.mkdocs-material
       ps.mkdocstrings
