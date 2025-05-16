@@ -1,5 +1,6 @@
 import os
 import tomllib
+from typing import Any
 
 from git import Repo
 
@@ -29,9 +30,6 @@ def get_commit_hash(path=None):
 def get_config(filename, config_path) -> Any:
     with open(f"{filename}.conf.toml", "rb") as f:
         data = tomllib.load(f)
-    val = data
-    for r in realm:
-        val = val[r]
     for c in config_path:
-        val = val[c]
-    return val
+        data = data[c]
+    return data

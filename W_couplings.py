@@ -12,25 +12,24 @@ from numba import jit, prange
 from qutip import jmat
 from tqdm import trange
 
-from constants import *
+from constants import (erbium_gamma, gamma_ratio, gamma_w, h, lattice_s,
+                       lattice_x, lattice_y, lattice_z, mu_0, omega_I, omega_S,
+                       site_nb)
+from gitlock import get_commit_hash, get_config
 
-# In[2]:
-
-
-# In[3]:
-
-
-# Beware to change this if hamiltonian or attrs structure changes !!!
-version = "v1"
-
-xy_max = 2 / 180 * np.pi
-
-file = "ultra_small_--.hdf5"
-
-size = 1
+x_start = get_config("couplings", ["range", "x_start"])
+y_start = get_config("couplings", ["range", "y_start"])
+x_end = get_config("couplings", ["range", "x_end"])
+y_end = get_config("couplings", ["range", "y_end"])
 
 
-# In[4]:
+x_max = get_config("couplings", ["angle", "x_max"]) / 180 * np.pi
+y_max = get_config("couplings", ["angle", "y_max"]) / 180 * np.pi
+x_size = get_config("couplings", ["range", "x_size"]) / 180 * np.pi
+y_size = get_config("couplings", ["range", "y_size"]) / 180 * np.pi
+
+filename = get_config("couplings", ["filename"])
+max_distance = get_config("couplings", ["lattice", "max_distance"])
 
 
 def get_full_H_matrices(spin, pre_dim, post_dim):
@@ -118,7 +117,7 @@ mu_I2 = gamma_w * I2
 def get_zeeman(B0):
     # Zeeman for each atom in the 8dim Hailtonian
     H_zeeman_erbium = (
-        h
+        -h  # Minus sign to compensate mu_S minus sign!
         / 2
         / np.pi
         * omega_S
@@ -242,6 +241,9 @@ def coord_to_index(vec, max_distance, site_nb):
 
 @jit(parallel=True)
 def get_all_couplings(max_distance, site_nb, B):
+    """
+    It is ok to place the niobium in 0,0,0,0 since our system is invariant under B_field + spins inversion
+    """
     couplings = np.empty((max_distance**3 * site_nb, max_distance**3 * site_nb))
     a_par = np.empty(max_distance**3 * site_nb)
     nb_par = np.empty(max_distance**3 * site_nb)
@@ -274,51 +276,60 @@ def vector_couplings(max_distance, site_nb, B):
 
 # Generate all couplings !
 
-if os.path.isfile(file):
+if os.path.isfile(filename):
     pass
     # raise ValueError(f"A file named {file} already exists")
 
-with h5py.File(file, "w") as f:
-    f.require_group("couplings")
-    f["couplings"].attrs["size"] = size
-    f["couplings"].attrs["xymax"] = xy_max
-    f["couplings"].attrs["x_start"] = 0
-    f["couplings"].attrs["x_end"] = size + 1
-    f["couplings"].attrs["y_start"] = 0
-    f["couplings"].attrs["y_end"] = size + 1
-    for x in trange(0, size + 1):
-        for y in trange(0, size + 1):
+git_commit = get_commit_hash()
+
+with h5py.File(filename, "w") as f:
+
+    attrs = {
+        "git_commit": git_commit,
+        "max_distance": max_distance,
+        "lattice_x": lattice_x,
+        "lattice_y": lattice_y,
+        "lattice_z": lattice_z,
+        "lattice_s": lattice_s,
+        "erbium_position": erbium_position,
+        "erbium_gamma": erbium_gamma,
+        "omega_I": omega_I,
+        "omega_S": omega_S,
+        "gamma_w": gamma_w,
+        "x_max": x_max,
+        "y_max": y_max,
+        "x_size": x_size,
+        "y_size": y_size,
+        "x_start": x_start,
+        "x_end": x_end,
+        "y_start": y_start,
+        "y_end": y_end,
+    }
+
+    for k, v in attrs.items():
+        f.attrs[k] = v
+    for x in trange(x_start, x_end):
+        for y in trange(y_start, y_end):
             grp_name = f"B_sweep_{x}_{y}"
-            if grp_name in f["couplings"]:
+            if grp_name in f:
                 print(f"Skipping {grp_name}")
                 continue
-            B = np.array([x * xy_max / size, y * xy_max / size, 1])
+            B = np.array([x * x_max / x_size, y * y_max / y_size, 1])
             B_0 = B / np.linalg.norm(B)
             all_couplings, a_parallel, nb_par = vector_couplings(
                 max_distance=max_distance, site_nb=site_nb, B=B_0
             )
 
-            g = f["couplings"].create_group(grp_name)
+            g = f.create_group(grp_name)
             d1 = g.create_dataset(name="SEDOR_couplings", data=all_couplings)
             d2 = g.create_dataset(name="A_par_couplings", data=a_parallel)
             d3 = g.create_dataset(name="NB_couplings", data=nb_par)
 
             attrs = {
-                "max_distance": max_distance,
-                "lattice_x": lattice_x,
-                "lattice_y": lattice_y,
-                "lattice_z": lattice_z,
-                "lattice_s": lattice_s,
-                "erbium_position": erbium_position,
-                "erbium_gamma": erbium_gamma,
-                "omega_I": omega_I,
-                "omega_S": omega_S,
-                "gamma_w": gamma_w,
                 "B": B_0,
+                "x": x,
+                "y": y,
             }
 
             for k, v in attrs.items():
                 g.attrs[k] = v
-
-
-# In[10]:
