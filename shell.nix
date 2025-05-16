@@ -1,9 +1,13 @@
 { nixpkgs ? (import ./npins).nixpkgs, pkgs ? import nixpkgs { config.allowUnfree = true; } }:
-
 pkgs.mkShell {
   packages = [
-    (pkgs.python3.withPackages (ps: [
-      (ps.callPackage ./npins/mpl-label-lines.nix {})
+    (pkgs.python3.withPackages (ps: let
+      mpl-label-lines = ps.callPackage ./npins/mpl-label-lines.nix {};
+      jupyterlab-h5web = ps.callPackage ./npins/jupyterlab-h5web.nix { inherit h5grove; };
+      h5grove = ps.callPackage ./npins/h5grove.nix {};
+    in [
+      mpl-label-lines
+      jupyterlab-h5web
       ps.numpy
       ps.scipy
       ps.ipython
