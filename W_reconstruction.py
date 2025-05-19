@@ -229,8 +229,7 @@ def compute_sites(
 
 
 if os.path.isfile(file):
-    pass
-    # raise ValueError(f"A file named {file} already exists")
+    raise ValueError(f"A file named {file} already exists")
 
 git_commit = get_commit_hash()
 

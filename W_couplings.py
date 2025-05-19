@@ -277,8 +277,7 @@ def vector_couplings(max_distance, site_nb, B):
 # Generate all couplings !
 
 if os.path.isfile(filename):
-    pass
-    # raise ValueError(f"A file named {file} already exists")
+    raise ValueError(f"A file named {filename} already exists")
 
 git_commit = get_commit_hash()
 
