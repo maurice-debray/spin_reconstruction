@@ -273,7 +273,7 @@ with h5py.File(couplings_file, "r") as f:
                 )
                 if ended_prematurely:
                     n_partial += 1
-                d = gr.create_group(f"Reconstructed_from_{k}")
+                d = gr.create_group(f"Reconstructed_from_{key}")
                 d.attrs["ended_prematurely"] = ended_prematurely
                 for k, val in v.attrs.items():
                     d.attrs[k] = val
