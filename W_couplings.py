@@ -25,8 +25,8 @@ y_end = get_config("couplings", ["range", "y_end"])
 
 x_max = get_config("couplings", ["angle", "x_max"]) / 180 * np.pi
 y_max = get_config("couplings", ["angle", "y_max"]) / 180 * np.pi
-x_size = get_config("couplings", ["range", "x_size"]) / 180 * np.pi
-y_size = get_config("couplings", ["range", "y_size"]) / 180 * np.pi
+x_size = get_config("couplings", ["range", "x_size"])
+y_size = get_config("couplings", ["range", "y_size"])
 
 filename = get_config("couplings", ["filename"])
 max_distance = get_config("couplings", ["lattice", "max_distance"])
