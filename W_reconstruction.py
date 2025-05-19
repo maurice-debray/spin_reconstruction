@@ -252,7 +252,7 @@ with h5py.File(couplings_file, "r") as f:
             gr.attrs["a_par_weight"] = a_par_weight
             gr.attrs["nb_par_weight"] = nb_par_weight
             n_partial = 0
-            for k, v in f.items():
+            for key, v in f.items():
                 all_couplings = v["SEDOR_couplings"][:]
                 a_parallel = v["A_par_couplings"][:]
                 nb_par = v["NB_couplings"][:]
@@ -277,7 +277,7 @@ with h5py.File(couplings_file, "r") as f:
                 d.attrs["ended_prematurely"] = ended_prematurely
                 for k, val in v.attrs.items():
                     d.attrs[k] = val
-                d.attrs["couplings_key"] = k
+                d.attrs["couplings_key"] = key
 
                 d.create_dataset(name="sites", data=final_sites, dtype=np.int64)
                 d.create_dataset(name="permutation", data=permutation, dtype=np.uint64)
