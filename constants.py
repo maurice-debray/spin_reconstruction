@@ -34,5 +34,3 @@ lattice_s = np.array([[a, a, c]]) * np.array(
 site_nb = lattice_s.shape[0]
 
 erbium_position = lattice_x * 0.5 + lattice_y * 0.5 + lattice_z * 0.5
-
-max_distance = 10
