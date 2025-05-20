@@ -171,6 +171,7 @@ def compute_sites(
     n_tot = couplings.shape[0]
     couplings, permutation = set_placing_order(couplings.copy())
     a_par_data = a_par_data[permutation]
+    nb_par_data = nb_par_data[permutation]
     possible_configurations = np.array(
         [[i] + [0] * (n_tot - 1) for i in range(max_distance**3 * site_nb)],
         dtype=np.uint64,
