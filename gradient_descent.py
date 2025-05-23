@@ -5,15 +5,13 @@
 
 
 import numpy as np
-from numba import jit, prange
 from qutip import jmat
 from scipy.optimize import minimize
 
 from constants import (erbium_gamma, gamma_ratio, gamma_w, h, lattice_s,
-                       lattice_x, lattice_y, lattice_z, mu_0, omega_I, omega_S,
-                       site_nb)
+                       lattice_x, lattice_y, lattice_z, mu_0, omega_I, omega_S)
 from gitlock import get_config
-from measurement_data import a_par_data, nb_par_data, renormalized_data
+from measurement_data import *
 
 B_x = get_config("gradient_descent", ["angle", "B_x"]) / 180 * np.pi
 B_y = get_config("gradient_descent", ["angle", "B_y"]) / 180 * np.pi
@@ -74,13 +72,13 @@ def get_full_H_matrices(spin, pre_dim, post_dim):
 # In[5]:
 
 
-@jit
+# @jit
 def dipolar_hamiltonian(mu_1, mu_2, xyz):
     """
     Computes the full dipole hamiltonian of two nuclear spins magnetic moment
     """
     r = np.linalg.norm(xyz)
-    return (
+    H = (
         mu_0
         / 4
         / np.pi
@@ -97,9 +95,10 @@ def dipolar_hamiltonian(mu_1, mu_2, xyz):
             @ (xyz[0] * mu_2[0] + xyz[1] * mu_2[1] + xyz[2] * mu_2[2])
         )
     )
+    return H
 
 
-@jit
+# @jit
 def dipolar_diff_hamiltonian(mu_1, mu_2, xyz):
     """
     Computes the full dipole hamiltonian of two nuclear spins magnetic moment
@@ -190,7 +189,7 @@ mu_I1 = gamma_w * I1
 mu_I2 = gamma_w * I2
 
 
-@jit
+# @jit
 def get_zeeman(B0):
     # Zeeman for each atom in the 8dim Hailtonian
     H_zeeman_erbium = (
@@ -213,13 +212,13 @@ def get_zeeman(B0):
 erbium_position = lattice_x * 0.5 + lattice_y * 0.5 + lattice_z * 0.5
 
 
-@jit
+# @jit
 def get_hamiltonian2(r1, r2, B0, gamma_ratio):
     H_zeeman_erbium, H_zeeman_I1, H_zeeman_I2 = get_zeeman(B0)
     H_0 = (
         H_zeeman_erbium
         + H_zeeman_I1
-        + H_zeeman_I2
+        + gamma_ratio * H_zeeman_I2
         + dipolar_hamiltonian(mu_I1, gamma_ratio * mu_I2, r1 - r2)
         + dipolar_hamiltonian(mu_I1, mu_S, r1 - erbium_position)
         + dipolar_hamiltonian(gamma_ratio * mu_I2, mu_S, r2 - erbium_position)
@@ -227,7 +226,7 @@ def get_hamiltonian2(r1, r2, B0, gamma_ratio):
     return H_0
 
 
-@jit
+# @jit
 def get_diff_hamiltonian2(r1, r2, B0, gamma_ratio):
     H_1 = dipolar_diff_hamiltonian(
         mu_I1, gamma_ratio * mu_I2, r1 - r2
@@ -238,7 +237,7 @@ def get_diff_hamiltonian2(r1, r2, B0, gamma_ratio):
     return H_1, H_2
 
 
-@jit
+# @jit
 def get_hamiltonian(r, B0):
     H_zeeman_erbium, H_zeeman_I1, _ = get_zeeman(B0)
     H_0 = (
@@ -249,7 +248,7 @@ def get_hamiltonian(r, B0):
     return H_0
 
 
-@jit
+# @jit
 def get_diff_hamiltonian(r, B0):
     return dipolar_diff_hamiltonian(mu_I1, mu_S, r - erbium_position)
 
@@ -266,8 +265,7 @@ def compute_coupling(r1, r2, B, gamma_ratio):
     H = get_hamiltonian2(r1, r2, B, gamma_ratio)
     dH1, dH2 = get_diff_hamiltonian2(r1, r2, B, gamma_ratio)
 
-    eig, v = np.linalg.eigh(H)
-    eigv = np.asmatrix(v)
+    eig, eigv = np.linalg.eigh(H)
 
     dE1 = np.empty(3)
     dE2 = np.empty(3)
@@ -275,17 +273,17 @@ def compute_coupling(r1, r2, B, gamma_ratio):
     for grad_dir in range(3):
         dE1[grad_dir] = np.real(
             np.vdot(eigv[:, 0], dH1[grad_dir] @ eigv[:, 0])
-            + np.vdot(eigv[:, 3].H, dH1[grad_dir] @ eigv[:, 3])
-            - np.vdot(eigv[:, 1].H, dH1[grad_dir] @ eigv[:, 1])
-            - np.vdot(eigv[:, 2].H, dH1[grad_dir] @ eigv[:, 2])
+            + np.vdot(eigv[:, 3], dH1[grad_dir] @ eigv[:, 3])
+            - np.vdot(eigv[:, 1], dH1[grad_dir] @ eigv[:, 1])
+            - np.vdot(eigv[:, 2], dH1[grad_dir] @ eigv[:, 2])
         ).item()
 
     for grad_dir in range(3):
         dE2[grad_dir] = np.real(
-            np.vdot(eigv[:, 0].H, (dH2[grad_dir]) @ eigv[:, 0])
-            + np.vdot(eigv[:, 3].H, (dH2[grad_dir]) @ eigv[:, 3])
-            - np.vdot(eigv[:, 1].H, (dH2[grad_dir]) @ eigv[:, 1])
-            - np.vdot(eigv[:, 2].H, (dH2[grad_dir]) @ eigv[:, 2])
+            np.vdot(eigv[:, 0], (dH2[grad_dir]) @ eigv[:, 0])
+            + np.vdot(eigv[:, 3], (dH2[grad_dir]) @ eigv[:, 3])
+            - np.vdot(eigv[:, 1], (dH2[grad_dir]) @ eigv[:, 1])
+            - np.vdot(eigv[:, 2], (dH2[grad_dir]) @ eigv[:, 2])
         ).item()
 
     return (eig[0] + eig[3] - eig[1] - eig[2]) / h, dE1 / h, dE2 / h, eig, eigv
@@ -296,26 +294,26 @@ def compute_a_par(r, B):
     H = get_hamiltonian(r, B)
     dH = get_diff_hamiltonian(r, B)
 
-    eig, v = np.linalg.eigh(H)
-    eigv = np.asmatrix(v)
+    eig, eigv = np.linalg.eigh(H)
 
     dE = np.empty(3)
 
     for grad_dir in range(3):
         dE[grad_dir] = np.real(
-            eigv[:, 0].H * np.asmatrix(dH[grad_dir]) * eigv[:, 0]
-            + eigv[:, 1].H * np.asmatrix(dH[grad_dir]) * eigv[:, 1]
-            + eigv[:, 7].H * np.asmatrix(dH[grad_dir]) * eigv[:, 7]
-            + eigv[:, 6].H * np.asmatrix(dH[grad_dir]) * eigv[:, 6]
-            - eigv[:, 2].H * np.asmatrix(dH[grad_dir]) * eigv[:, 2]
-            - eigv[:, 3].H * np.asmatrix(dH[grad_dir]) * eigv[:, 3]
-            - eigv[:, 4].H * np.asmatrix(dH[grad_dir]) * eigv[:, 4]
-            - eigv[:, 5].H * np.asmatrix(dH[grad_dir]) * eigv[:, 5]
+            np.vdot(eigv[:, 0], dH[grad_dir] @ eigv[:, 0])
+            + np.vdot(eigv[:, 1], dH[grad_dir] @ eigv[:, 1])
+            + np.vdot(eigv[:, 7], dH[grad_dir] @ eigv[:, 7])
+            + np.vdot(eigv[:, 6], dH[grad_dir] @ eigv[:, 6])
+            - np.vdot(eigv[:, 2], dH[grad_dir] @ eigv[:, 2])
+            - np.vdot(eigv[:, 3], dH[grad_dir] @ eigv[:, 3])
+            - np.vdot(eigv[:, 4], dH[grad_dir] @ eigv[:, 4])
+            - np.vdot(eigv[:, 5], dH[grad_dir] @ eigv[:, 5])
         ).item()
 
     return (
-        eig[0] + eig[1] + eig[7] + eig[6] - eig[2] - eig[4] - eig[3] - eig[5]
-    ) / h / 2, dE / h / 2
+        (eig[0] + eig[1] + eig[7] + eig[6] - eig[2] - eig[4] - eig[3] - eig[5]) / h / 2,
+        dE / h / 2,
+    )
 
 
 # @jit
@@ -336,131 +334,68 @@ def index_to_position(i, max_distance, site_nb):
 
 # @jit(parallel=True)
 def cost(
-    positions,
+    position,
     B,
     couplings_data,
     a_par_data,
     nb_par_data,
     a_par_weight,
     nb_par_weight,
-    shape,
+    verbose=True,
 ):
-    err = np.zeros((len(a_par_data), len(a_par_data)))
-    jac = np.zeros((len(a_par_data), len(a_par_data), 3 * len(a_par_data)))
-    for i in prange(len(a_par_data)):
-        a_par, d_apar = compute_a_par(positions[3 * i : 3 * i + 3], B)
-        err[i, i] += a_par_weight * (a_par - a_par_data[i]) ** 2
-        jac[i, i, 3 * i : 3 * i + 3] += (
-            2 * a_par_weight * (a_par - a_par_data[i]) * d_apar
-        )
-        nb_par, d_nb_par, _, _, _ = compute_coupling(
-            positions[3 * i : 3 * i + 3],
-            0.5 * lattice_x + 0.5 * lattice_y,
-            B,
-            1 / gamma_ratio,
-        )
-        err[i, i] += nb_par_weight * (nb_par - nb_par_data[i]) ** 2
-        jac[i, i, 3 * i : 3 * i + 3] += (
-            2 * nb_par_weight * (nb_par - nb_par_data[i]) * d_nb_par
-        )
-    for i in prange(len(a_par_data)):
-        for j in prange(i + 1, len(a_par_data)):
-            if not np.isnan(couplings_data[i, j]):
-                cpl, d_cpl1, d_cpl2, _, _ = compute_coupling(
-                    positions[3 * i : 3 * i + 3], positions[3 * j : 3 * j + 3], B, 1
-                )
-
-                err[i, j] += (couplings_data[i, j] - cpl) ** 2
-                jac[i, j, 3 * i : 3 * i + 3] = 2 * (cpl - couplings_data[i, j]) * d_cpl1
-                jac[i, j, 3 * j : 3 * j + 3] = 2 * (cpl - couplings_data[i, j]) * d_cpl2
-    jac_sum = np.zeros(3 * len(a_par_data))
-    for i in range(len(a_par_data)):
-        for j in range(i, len(a_par_data)):
-            jac_sum += jac[i, j]
-
-    e = np.sum(err)
-    print(e, jac_sum)
-
-    return e, jac_sum
+    pos = position * 1e-10
+    a_par, d_apar = compute_a_par(pos, B)
+    nb_par, d_nb_par, _, _, _ = compute_coupling(
+        pos,
+        0.5 * lattice_x + 0.5 * lattice_y,
+        B,
+        1 / gamma_ratio,
+    )
+    err = (
+        nb_par_weight * ((nb_par - nb_par_data[0]) / 1e-1) ** 2
+        + a_par_weight * ((a_par - a_par_data[0]) / 8e3) ** 2
+    )
+    jac = (
+        2 * nb_par_weight * (nb_par - nb_par_data[0]) * d_nb_par / 1e-2
+        + 2 * a_par_weight * (a_par - a_par_data[0]) / 8e3 * d_apar / 8e3
+    )
+    if verbose:
+        print("---------------------------------")
+        print(err, jac)
+        print(pos)
+        print(nb_par, nb_par_data[0])
+        print(a_par, a_par_data[0])
+        print("---------------------------------")
+    return err, jac
 
 
 B = np.array([B_x, B_y, 1])
 B_0 = B / np.linalg.norm(B)
 
 
-def sanity_check():
-    B = np.array([B_x, B_y, 1])
-    B_0 = B / np.linalg.norm(B)
+# positions0 = np.array([index_to_position(i, max_distance, site_nb) for i in config])
+positions0 = np.array([0.965, 0.965e00, 1.073e01]) / 1e10
 
-    r = np.array([0, -2.5e-10, 5e-10])
-    dr = np.array([3e-13, 1e-13, 1e-13])
-
-    E, dE = compute_a_par(r, B_0)
-    E1, _ = compute_a_par(r + dr, B_0)
-
-    print(
-        f"""
-    Base A parallel: {E}
-    Gradient: {dE}
-    Energy at r+dr (1st order): {E + np.sum(dE*dr)}
-    Energy at r+dr (true): {E1}
-    """
+if __name__ == "__main__":
+    res = minimize(
+        cost,
+        positions0.flatten() * 1e10,
+        jac=True,
+        options={
+            # "maxiter": 1000,
+            "disp": True,
+            "ftol": 1e-2,
+        },
+        bounds=[(0, np.inf)]*3,
+        method="Nelder-Mead",
+        args=(
+            B_0,
+            renormalized_data,
+            a_par_data,
+            nb_par_data,
+            0.5,
+            0.5,
+        ),
     )
-    printrel(np.sum(dE * dr), (E1 - E))
-
-    r2 = np.array([0, 0, 0])
-    dr2 = np.array([0, 0, 0])
-
-    H = get_hamiltonian2(r, r2, B_0, 1.0)
-    H1 = get_hamiltonian2(r + dr, r2 + dr2, B_0, 1.0)
-    dH1, dH2 = get_diff_hamiltonian2(r, r2, B_0, 1.0)
-
-    dH = (
-        dH1[0] * dr[0]
-        + dH1[1] * dr[1]
-        + dH1[2] * dr[2]
-        + dH2[0] * dr2[0]
-        + dH2[1] * dr2[1]
-        + dH2[2] * dr2[2]
-    )
-    print((-H + H1 - (dH)) / (np.abs(H - H1)))
-
-    print(np.abs(H - H1))
-
-    E, dE, dE2, eig0, eigv0 = compute_coupling(r, r2, B_0, 1.0)
-    E1, _, _, eig, eigv = compute_coupling(r + dr, r2 + dr2, B_0, 1.0)
-
-    for i in range(8):
-        printrel(eigv0[:, i].H * np.asmatrix(dH) * eigv0[:, i], eig[i] - eig0[i])
-
-    print(
-        f"""
-    Base SEDOR: {E}
-    Gradient: {dE, dE2}
-    Energy at r+dr (1st order): {E + np.sum(dE*dr) + np.sum(dE2*dr2)}
-    Energy at r+dr (true): {E1}
-    Relative error = {np.abs(np.sum(dE*dr) + np.sum(dE2*dr2) - (E1-E))/np.abs(E1 - E)}
-    """
-    )
-
-
-positions0 = np.array([index_to_position(i, max_distance, site_nb) for i in config])
-
-
-res = minimize(
-    cost,
-    positions0.flatten(),
-    jac=True,
-    options={"maxiter": 1000, "disp": True},
-    args=(
-        B_0,
-        renormalized_data,
-        a_par_data,
-        nb_par_data,
-        a_par_weight,
-        nb_par_weight,
-        positions0.shape,
-    ),
-)
-print(positions0.flatten())
-print(res.x)
+    print(positions0.flatten())
+    print(res)
