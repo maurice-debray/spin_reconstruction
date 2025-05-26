@@ -142,7 +142,7 @@ def get_hamiltonian2(r1, r2, B0, gamma_ratio):
     H_0 = (
         H_zeeman_erbium
         + H_zeeman_I1
-        + H_zeeman_I2
+        + gamma_ratio * H_zeeman_I2
         + dipolar_hamiltonian(mu_I1, gamma_ratio * mu_I2, r1 - r2)
         + dipolar_hamiltonian(mu_I1, mu_S, r1 - erbium_position)
         + dipolar_hamiltonian(gamma_ratio * mu_I2, mu_S, r2 - erbium_position)
