@@ -20,7 +20,7 @@ lattice_z = np.array([0, 0, c])
 
 
 omega_I = -799.531e3 * 2 * np.pi  # Mean of measured values
-omega_S = -7_741_655_681 * 2 * np.pi  # Measured value
+omega_S = 7_741_655_681 * 2 * np.pi  # Measured value
 
 lattice_s = np.array([[a, a, c]]) * np.array(
     [
