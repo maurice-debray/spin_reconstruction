@@ -31,34 +31,6 @@ file = get_config("fine_reconstruction", ["filename"])
 couplings_file = get_config("fine_reconstruction", ["couplings_file"])
 
 
-# # State reconstruction
-
-# In[4]:
-
-
-@jit
-def index_to_coord(index, max_distance, site_nb):
-    center = max_distance // 2
-    return (
-        index // (max_distance**2 * site_nb) - center,
-        index // (max_distance * site_nb) % max_distance - center,
-        index // site_nb % max_distance - center,
-        index % site_nb,
-    )
-
-
-@jit
-def coord_to_index(vec, max_distance, site_nb):
-    center = max_distance // 2
-    return (
-        ((vec[0] + center) * max_distance + (vec[1] + center)) * max_distance
-        + (vec[2] + center)
-    ) * site_nb + vec[3]
-
-
-# In[5]:
-
-
 @jit
 def exchange_columns(couplings, permutation, a, b):
     a, b = min(a, b), max(a, b)
@@ -99,13 +71,13 @@ def compute_new_possible_config(possible_configurations, size, len_config, n_pla
     return new_possible_configurations
 
 
-@jit(parallel=True)
 def all_error_cost(
     configs,
     coupl,
     a_par_data,
     nb_par_data,
     n_max,
+    all_couplings_index,
     all_couplings,
     a_par,
     nb_par,
@@ -123,8 +95,8 @@ def all_error_cost(
             if not np.isnan(a_par_data[i]):
                 err += a_par_weight * (a_par[i, config[i]] - a_par_data[i]) ** 2
             if (
-                np.isnan(nb_par[config[i]])
-                or np.abs(nb_par[config[i]] - nb_par_data[i]) > nb_tolerance
+                np.isnan(nb_par[i, config[i]])
+                or np.abs(nb_par[i, config[i]] - nb_par_data[i]) > nb_tolerance
             ):
                 err = np.inf
                 break
@@ -133,15 +105,15 @@ def all_error_cost(
                 err += nb_par_weight * (nb_par[i, config[i]] - nb_par_data[i]) ** 2
             for j in range(i + 1, n_max):
                 # WW couplings
-                if all_couplings[i][j] is None:
-                    # We don't have couplings, let's skip
-                    continue
-                coupling = all_couplings[i][j][config[i], config[j]]
-                if np.isnan(coupling) or np.abs(coupling - coupl[i, j]) > tolerance:
-                    err = np.inf
-                    break
-                if not np.isnan(coupl[i, j]):
-                    err += (coupl[i, j] - coupling) ** 2
+                if all_couplings_index[i, j] != -1:
+                    coupling = all_couplings[
+                        all_couplings_index[i, j], config[i], config[j]
+                    ]
+                    if np.isnan(coupling) or np.abs(coupling - coupl[i, j]) > tolerance:
+                        err = np.inf
+                        break
+                    if not np.isnan(coupl[i, j]):
+                        err += (coupl[i, j] - coupling) ** 2
             if err == np.inf:
                 break
         errors[k] = err
@@ -152,7 +124,7 @@ def compute_sites(
     couplings,
     a_par_data,
     nb_par_data,
-    WW_couplings,
+    theo_couplings,
     a_par,
     nb_par,
     tolerance,
@@ -171,14 +143,24 @@ def compute_sites(
     a_par = a_par[permutation]
     nb_par_data = nb_par_data[permutation]
     nb_par = nb_par[permutation]
-    WW_couplings = [
-        [WW_couplings[permutation[i]][permutation[j]] for j in range(n_tot)]
-        for i in range(n_tot)
-    ]
+    print("Allocating")
+    WW_couplings_index = np.full((n_tot, n_tot), -1, dtype=np.int64)
+    WW_couplings = np.empty((len(theo_couplings), size, size))
+
+    print("Allocated")
+
+    k = 0
+    for j in range(n_tot):
+        for i in range(n_tot):
+            if (permutation[i], permutation[j]) in theo_couplings:
+                WW_couplings_index[i, j] = k
+                WW_couplings[k] = theo_couplings[(permutation[i], permutation[j])]
+                k += 1
     possible_configurations = np.array(
         [[i] + [0] * (n_tot - 1) for i in range(size)],
         dtype=np.uint64,
     )
+    print(WW_couplings.shape, a_par.shape, nb_par.shape, permutation)
 
     # initialize some reconstruction
     inf_index: np.intp = size
@@ -189,7 +171,7 @@ def compute_sites(
 
         if verbose:
             print(
-                f"Placing {n_placed} (linked to {edge_spin}). {len(possible_configurations)}*{len(all_couplings)} cases to process."
+                f"Placing {n_placed} (linked to {edge_spin}). {len(possible_configurations)}*{len(WW_couplings)} cases to process."
             )
         new_possible_configurations = compute_new_possible_config(
             possible_configurations, size, n_tot, n_placed
@@ -206,7 +188,8 @@ def compute_sites(
             a_par_data,
             nb_par_data,
             n_placed + 1,
-            all_couplings,
+            WW_couplings_index,
+            WW_couplings,
             a_par,
             nb_par,
             a_par_weight,
@@ -253,17 +236,12 @@ with h5py.File(couplings_file, "r") as f:
         g.attrs["nb_tolerance"] = nb_tolerance
         g.attrs["a_par_weight"] = a_par_weight
         g.attrs["nb_par_weight"] = nb_par_weight
-        all_couplings = [
-            [
-                (
-                    f[f"/SEDOR_couplings/{i}_{j}"][:]
-                    if f"/SEDOR_couplings/{i}_{j}" in f
-                    else None
-                )
-                for j in range(len(a_par_data))
-            ]
+        all_couplings = {
+            (i, j): (np.array(f[f"/SEDOR_couplings/{i}_{j}"][:], dtype=np.float64))
+            for j in range(len(a_par_data))
             for i in range(len(a_par_data))
-        ]
+            if f"/SEDOR_couplings/{i}_{j}" in f
+        }
         a_par = np.array([f[f"A_par_couplings/{i}"][:] for i in range(len(a_par_data))])
         nb_par = np.array(
             [f[f"Nb_par_couplings/{i}"][:] for i in range(len(a_par_data))]
@@ -282,6 +260,7 @@ with h5py.File(couplings_file, "r") as f:
             cutoff=cutoff,
             verbose=True,
         )
-        g.create_dataset(name="sites", data=final_sites, dtype=np.int64)
+        g.attrs["partial_solution"] = ended_prematurely
+        g.create_dataset(name="sites", data=final_sites, dtype=np.uint64)
         g.create_dataset(name="permutation", data=permutation, dtype=np.uint64)
         g.create_dataset(name="errors", data=errors)
