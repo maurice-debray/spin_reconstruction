@@ -1,0 +1,8 @@
+filename = "reconstructed_apar_sweep_full.hdf5"
+couplings_file = "couplings_quarter_full.hdf5"
+
+[cost]
+# Reference frequencies to compute the cost function weight (tungsten ref is 1 Hz)
+a_par_refs = [8e100, 30.8e5, 20.5e5, 13.7e5, 9.1e5, 61e4, 41e4, 27e4, 18e4, 12e4, 8e4, 5.3e4, 3.6e4, 2.4e4, 1.6e4, 1e4, 8e3, 8e2, 8e1, 8]
+tolerance = 1.8
+cutoff = 2000

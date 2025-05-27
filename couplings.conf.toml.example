@@ -1,0 +1,18 @@
+filename = "couplings_quarter_full.hdf5"
+
+[lattice]
+max_distance = 9
+
+[range]
+# the range will go from start*max/size to end*max/size by steps of max/size
+x_start = -2
+x_end = 21
+x_size = 20
+y_start = -2
+y_end = 21
+y_size = 20
+
+
+[angle]
+x_max = 2
+y_max = 2
