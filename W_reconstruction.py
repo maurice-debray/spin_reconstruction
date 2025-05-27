@@ -12,7 +12,7 @@ from numba import jit, prange
 from tqdm import tqdm
 
 from constants import gamma_ratio, site_nb
-from gitlock import get_commit_hash, get_config
+from gitlock import get_commit_hash, get_config, get_config_default
 from measurement_data import a_par_data, nb_par_data, renormalized_data
 
 # In[2]:
@@ -28,6 +28,8 @@ cutoff = get_config("reconstruction", ["cost", "cutoff"])
 
 file = get_config("reconstruction", ["filename"])
 couplings_file = get_config("reconstruction", ["couplings_file"])
+all_B = get_config_default("reconstruction", ["all_B"], True)
+coupling_keys = get_config_default("reconstruction", ["coupling_keys"], [])
 
 
 # # State reconstruction
@@ -253,6 +255,9 @@ with h5py.File(couplings_file, "r") as f:
             gr.attrs["nb_par_weight"] = nb_par_weight
             n_partial = 0
             for key, v in f.items():
+                if not all_B and key not in coupling_keys:
+                    # This is a bit hacky but fine for now.
+                    continue
                 all_couplings = v["SEDOR_couplings"][:]
                 a_parallel = v["A_par_couplings"][:]
                 nb_par = v["NB_couplings"][:]
