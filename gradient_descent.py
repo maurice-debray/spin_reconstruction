@@ -16,8 +16,8 @@ from measurement_data import *
 B_x = get_config("gradient_descent", ["angle", "B_x"]) / 180 * np.pi
 B_y = get_config("gradient_descent", ["angle", "B_y"]) / 180 * np.pi
 
-config = get_config("gradient_descent", ["config"])
-max_distance = get_config("gradient_descent", ["max_distance"])
+config = get_config("gradient_descent", ["ansatz", "config"])
+max_distance = get_config("gradient_descent", ["ansatz", "max_distance"])
 
 a_par_weight = 0
 """np.array(
@@ -386,7 +386,7 @@ if __name__ == "__main__":
             "disp": True,
             "ftol": 1e-2,
         },
-        bounds=[(0, np.inf)]*3,
+        bounds=[(0, np.inf)] * 3,
         method="Nelder-Mead",
         args=(
             B_0,
