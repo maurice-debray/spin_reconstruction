@@ -35,3 +35,13 @@ def get_config(filename, config_path) -> Any:
     for c in config_path:
         data = data[c]
     return data
+
+
+def get_config_default(filename, config_path, default=None) -> Any:
+    with open(f"{filename}.conf.toml", "rb") as f:
+        data = tomllib.load(f)
+    for c in config_path:
+        if c not in data:
+            return default
+        data = data[c]
+    return data
