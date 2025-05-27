@@ -23,9 +23,9 @@ B_y = get_config("fine_couplings", ["angle", "B_y"]) / 180 * np.pi
 distance = get_config("fine_couplings", ["displacement", "distance"])
 size = get_config("fine_couplings", ["displacement", "size"])
 
-config = get_config("fine_couplings", ["config"])
-to_compute = get_config("fine_couplings", ["to_compute"])
-max_distance = get_config("fine_couplings", ["max_distance"])
+config = get_config("fine_couplings", ["ansatz", "config"])
+to_compute = get_config("fine_couplings", ["ansatz", "to_compute"])
+max_distance = get_config("fine_couplings", ["ansatz", "max_distance"])
 
 filename = get_config("fine_couplings", ["filename"])
 
