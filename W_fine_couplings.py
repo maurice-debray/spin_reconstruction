@@ -259,6 +259,7 @@ def index_to_position(i, max_distance, site_nb):
     c = index_to_coord(i, max_distance, site_nb)
     return c[0] * lattice_x + c[1] * lattice_y + c[2] * lattice_z + lattice_s[c[3]]
 
+
 if __name__ == "__main__":
     # Generate all couplings !
 
