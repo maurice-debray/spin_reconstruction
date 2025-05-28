@@ -9,6 +9,7 @@ pkgs.mkShell {
       mpl-label-lines
       jupyterlab-h5web
       ps.numpy
+      ps.adjusttext
       ps.scipy
       ps.ipython
       ps.tqdm
