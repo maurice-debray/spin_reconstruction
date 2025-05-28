@@ -259,76 +259,76 @@ def index_to_position(i, max_distance, site_nb):
     c = index_to_coord(i, max_distance, site_nb)
     return c[0] * lattice_x + c[1] * lattice_y + c[2] * lattice_z + lattice_s[c[3]]
 
+if __name__ == "__main__":
+    # Generate all couplings !
 
-# Generate all couplings !
+    if os.path.isfile(filename):
+        raise ValueError(f"A file named {filename} already exists")
 
-if os.path.isfile(filename):
-    raise ValueError(f"A file named {filename} already exists")
+    git_commit = get_commit_hash()
 
-git_commit = get_commit_hash()
-
-with h5py.File(filename, "w") as f:
-    B = np.array([B_x, B_y, 1])
-    B_0 = B / np.linalg.norm(B)
-
-    attrs = {
-        "git_commit": git_commit,
-        "max_distance": max_distance,
-        "lattice_x": lattice_x,
-        "lattice_y": lattice_y,
-        "lattice_z": lattice_z,
-        "lattice_s": lattice_s,
-        "erbium_position": erbium_position,
-        "erbium_gamma": erbium_gamma,
-        "omega_I": omega_I,
-        "omega_S": omega_S,
-        "gamma_w": gamma_w,
-        "distance": distance,
-        "size": size,
-        "config": config,
-        "B_x": B_x,
-        "B_y": B_y,
-        "B": B_0,
-    }
-    for k, v in attrs.items():
-        f.attrs[k] = v
-
-    sedor_group = f.create_group("SEDOR_couplings")
-    a_par_group = f.create_group("A_par_couplings")
-    nb_par_group = f.create_group("Nb_par_couplings")
-    n = len(config)
-    for i in trange(n):
-        grp_name = f"{i}"
-
-        r1 = index_to_position(config[i], max_distance, site_nb)
-
-        a_par, nb_par = get_all_a_par(r1, size, distance, B_0)
-
-        d1 = a_par_group.create_dataset(name=grp_name, data=a_par)
-        d2 = nb_par_group.create_dataset(name=grp_name, data=nb_par)
+    with h5py.File(filename, "w") as f:
+        B = np.array([B_x, B_y, 1])
+        B_0 = B / np.linalg.norm(B)
 
         attrs = {
-            "x": i,
+            "git_commit": git_commit,
+            "max_distance": max_distance,
+            "lattice_x": lattice_x,
+            "lattice_y": lattice_y,
+            "lattice_z": lattice_z,
+            "lattice_s": lattice_s,
+            "erbium_position": erbium_position,
+            "erbium_gamma": erbium_gamma,
+            "omega_I": omega_I,
+            "omega_S": omega_S,
+            "gamma_w": gamma_w,
+            "distance": distance,
+            "size": size,
+            "config": config,
+            "B_x": B_x,
+            "B_y": B_y,
+            "B": B_0,
         }
-
         for k, v in attrs.items():
-            d1.attrs[k] = v
-            d2.attrs[k] = v
+            f.attrs[k] = v
 
-    for x, y in tqdm(to_compute):
-        grp_name = f"{x}_{y}"
+        sedor_group = f.create_group("SEDOR_couplings")
+        a_par_group = f.create_group("A_par_couplings")
+        nb_par_group = f.create_group("Nb_par_couplings")
+        n = len(config)
+        for i in trange(n):
+            grp_name = f"{i}"
 
-        r1 = index_to_position(config[x], max_distance, site_nb)
-        r2 = index_to_position(config[y], max_distance, site_nb)
+            r1 = index_to_position(config[i], max_distance, site_nb)
 
-        all_couplings = get_all_couplings(r1, r2, size, distance, B_0)
+            a_par, nb_par = get_all_a_par(r1, size, distance, B_0)
 
-        d1 = sedor_group.create_dataset(name=grp_name, data=all_couplings)
+            d1 = a_par_group.create_dataset(name=grp_name, data=a_par)
+            d2 = nb_par_group.create_dataset(name=grp_name, data=nb_par)
 
-        attrs = {
-            "x": x,
-            "y": y,
-        }
+            attrs = {
+                "x": i,
+            }
 
-        for k, v in attrs.items():
-            d1.attrs[k] = v
+            for k, v in attrs.items():
+                d1.attrs[k] = v
+                d2.attrs[k] = v
+
+        for x, y in tqdm(to_compute):
+            grp_name = f"{x}_{y}"
+
+            r1 = index_to_position(config[x], max_distance, site_nb)
+            r2 = index_to_position(config[y], max_distance, site_nb)
+
+            all_couplings = get_all_couplings(r1, r2, size, distance, B_0)
+
+            d1 = sedor_group.create_dataset(name=grp_name, data=all_couplings)
+
+            attrs = {
+                "x": x,
+                "y": y,
+            }
+
+            for k, v in attrs.items():
+                d1.attrs[k] = v
