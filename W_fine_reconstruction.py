@@ -71,6 +71,7 @@ def compute_new_possible_config(possible_configurations, size, len_config, n_pla
     return new_possible_configurations
 
 
+@jit(parallel=True)
 def all_error_cost(
     configs,
     coupl,
@@ -124,7 +125,8 @@ def compute_sites(
     couplings,
     a_par_data,
     nb_par_data,
-    theo_couplings,
+    WW_couplings,
+    WW_couplings_index,
     a_par,
     nb_par,
     tolerance,
@@ -143,19 +145,15 @@ def compute_sites(
     a_par = a_par[permutation]
     nb_par_data = nb_par_data[permutation]
     nb_par = nb_par[permutation]
-    print("Allocating")
-    WW_couplings_index = np.full((n_tot, n_tot), -1, dtype=np.int64)
-    WW_couplings = np.empty((len(theo_couplings), size, size))
-
-    print("Allocated")
-
-    k = 0
-    for j in range(n_tot):
-        for i in range(n_tot):
-            if (permutation[i], permutation[j]) in theo_couplings:
-                WW_couplings_index[i, j] = k
-                WW_couplings[k] = theo_couplings[(permutation[i], permutation[j])]
-                k += 1
+    WW_couplings_index_permuted = np.array(  # Maybe there is a fancier way to do it with strange numpy indexing. Let's leave this for latter
+        [
+            [
+                WW_couplings_index[permutation[i], permutation[j]]
+                for j in range(len(permutation))
+            ]
+            for i in range(len(permutation))
+        ]
+    )
     possible_configurations = np.array(
         [[i] + [0] * (n_tot - 1) for i in range(size)],
         dtype=np.uint64,
@@ -188,7 +186,7 @@ def compute_sites(
             a_par_data,
             nb_par_data,
             n_placed + 1,
-            WW_couplings_index,
+            WW_couplings_index_permuted,
             WW_couplings,
             a_par,
             nb_par,
@@ -236,21 +234,38 @@ with h5py.File(couplings_file, "r") as f:
         g.attrs["nb_tolerance"] = nb_tolerance
         g.attrs["a_par_weight"] = a_par_weight
         g.attrs["nb_par_weight"] = nb_par_weight
-        all_couplings = {
-            (i, j): (np.array(f[f"/SEDOR_couplings/{i}_{j}"][:], dtype=np.float64))
-            for j in range(len(a_par_data))
-            for i in range(len(a_par_data))
-            if f"/SEDOR_couplings/{i}_{j}" in f
-        }
+
         a_par = np.array([f[f"A_par_couplings/{i}"][:] for i in range(len(a_par_data))])
         nb_par = np.array(
             [f[f"Nb_par_couplings/{i}"][:] for i in range(len(a_par_data))]
         )
+
+        print("Allocating")
+        n_tot = len(a_par_data)
+        size = a_par.shape[1]
+        print(n_tot, size)
+        WW_couplings_index = np.full((n_tot, n_tot), -1, dtype=np.int64)
+        WW_couplings = np.empty((len(f["/SEDOR_couplings"].keys()), size, size))
+
+        print("Allocated")
+
+        k = 0
+        # TODO Improve this: It can be done with a single loop over the hdf5 keys
+        for j in range(n_tot):
+            for i in range(n_tot):
+                if f"/SEDOR_couplings/{i}_{j}" in f:
+                    WW_couplings_index[i, j] = k
+                    WW_couplings[k] = np.array(
+                        f[f"/SEDOR_couplings/{i}_{j}"], dtype=np.float64
+                    )
+                    k += 1
+
         final_sites, permutation, errors, ended_prematurely = compute_sites(
             renormalized_data,
             a_par_data,
             nb_par_data,
-            all_couplings,
+            WW_couplings,
+            WW_couplings_index,
             a_par=a_par,
             nb_par=nb_par,
             tolerance=tolerance,
