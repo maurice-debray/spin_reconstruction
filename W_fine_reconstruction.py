@@ -30,6 +30,8 @@ cutoff = get_config("fine_reconstruction", ["cost", "cutoff"])
 file = get_config("fine_reconstruction", ["filename"])
 couplings_file = get_config("fine_reconstruction", ["couplings_file"])
 
+selected_sites = get_config("fine_reconstruction", ["selected_sites"])
+
 
 @jit
 def exchange_columns(couplings, permutation, a, b):
@@ -234,14 +236,13 @@ with h5py.File(couplings_file, "r") as f:
         g.attrs["nb_tolerance"] = nb_tolerance
         g.attrs["a_par_weight"] = a_par_weight
         g.attrs["nb_par_weight"] = nb_par_weight
+        g.attrs["selected_sites"] = selected_sites
 
-        a_par = np.array([f[f"A_par_couplings/{i}"][:] for i in range(len(a_par_data))])
-        nb_par = np.array(
-            [f[f"Nb_par_couplings/{i}"][:] for i in range(len(a_par_data))]
-        )
+        n_tot = len(a_par_data)
+        a_par = np.array([f[f"A_par_couplings/{i}"][:] for i in range(n_tot)])
+        nb_par = np.array([f[f"Nb_par_couplings/{i}"][:] for i in range(n_tot)])
 
         print("Allocating")
-        n_tot = len(a_par_data)
         size = a_par.shape[1]
         print(n_tot, size)
         WW_couplings_index = np.full((n_tot, n_tot), -1, dtype=np.int64)
@@ -261,13 +262,17 @@ with h5py.File(couplings_file, "r") as f:
                     k += 1
 
         final_sites, permutation, errors, ended_prematurely = compute_sites(
-            renormalized_data,
-            a_par_data,
-            nb_par_data,
+            renormalized_data[
+                np.meshgrid(selected_sites, selected_sites, indexing="ij")
+            ],
+            a_par_data[selected_sites],
+            nb_par_data[selected_sites],
             WW_couplings,
-            WW_couplings_index,
-            a_par=a_par,
-            nb_par=nb_par,
+            WW_couplings_index[
+                np.meshgrid(selected_sites, selected_sites, indexing="ij")
+            ],
+            a_par=a_par[selected_sites],
+            nb_par=nb_par[selected_sites],
             tolerance=tolerance,
             nb_tolerance=nb_tolerance,
             a_par_weight=a_par_weight,
