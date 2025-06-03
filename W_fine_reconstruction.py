@@ -32,6 +32,9 @@ couplings_file = get_config("fine_reconstruction", ["couplings_file"])
 
 selected_sites = get_config("fine_reconstruction", ["selected_sites"])
 
+if len(selected_sites) == 0:
+    selected_sites = list(range(len(a_par_data)))
+
 
 @jit
 def exchange_columns(couplings, permutation, a, b):
