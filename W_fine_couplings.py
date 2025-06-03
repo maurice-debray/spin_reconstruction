@@ -255,6 +255,21 @@ def get_all_couplings(vec1, vec2, size, distance, B):
     return couplings
 
 
+@jit(parallel=True)
+def get_all_nb_couplings(vec1, size, distance, B):
+    """
+    It is ok to place the niobium in 0,0,0,0 since our system is invariant under B_field + spins inversion
+    """
+    couplings = np.empty((size**3, size**3))
+    for i in prange(size**3):
+        for j in prange(size**3):
+            r1 = compute_dr(i, size, distance) + vec1
+            r2 = compute_dr(j, size, distance) + lattice_s[0]
+            c = compute_coupling(r1, r2, B, 1 / gamma_ratio)
+            couplings[i, j] = c
+    return couplings
+
+
 def index_to_position(i, max_distance, site_nb):
     c = index_to_coord(i, max_distance, site_nb)
     return c[0] * lattice_x + c[1] * lattice_y + c[2] * lattice_z + lattice_s[c[3]]
@@ -297,6 +312,7 @@ if __name__ == "__main__":
         sedor_group = f.create_group("SEDOR_couplings")
         a_par_group = f.create_group("A_par_couplings")
         nb_par_group = f.create_group("Nb_par_couplings")
+        full_nb_par_group = f.create_group("Nb_par_couplings_full")
         n = len(config)
         for i in trange(n):
             grp_name = f"{i}"
@@ -305,8 +321,11 @@ if __name__ == "__main__":
 
             a_par, nb_par = get_all_a_par(r1, size, distance, B_0)
 
+            nb_par_full = get_all_nb_couplings(r1, size, distance, B_0)
+
             d1 = a_par_group.create_dataset(name=grp_name, data=a_par)
             d2 = nb_par_group.create_dataset(name=grp_name, data=nb_par)
+            d3 = full_nb_par_group.create_dataset(name=grp_name, data=nb_par_full)
 
             attrs = {
                 "x": i,
@@ -315,6 +334,7 @@ if __name__ == "__main__":
             for k, v in attrs.items():
                 d1.attrs[k] = v
                 d2.attrs[k] = v
+                d3.attrs[k] = v
 
         for x, y in tqdm(to_compute):
             grp_name = f"{x}_{y}"
