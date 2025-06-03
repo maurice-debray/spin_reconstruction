@@ -229,6 +229,8 @@ git_commit = get_commit_hash()
 with h5py.File(couplings_file, "r") as f:
     with h5py.File(file, "w") as g:
         for k, val in f.attrs.items():
+            g.attrs[f"couplings_file_{k}"] = val
+            # This line is kept for backward compatibility of the file format
             g.attrs[k] = val
         g.attrs["git_commit"] = git_commit
         mdata = g.create_group("measured_data")
