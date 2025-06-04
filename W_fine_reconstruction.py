@@ -95,20 +95,22 @@ def all_error_cost(
     errors = np.zeros(len(configs))
     for k in prange(len(configs)):
         err = 0.0
-        config = configs[k]
+        niobium_site = configs[k, 0]
+        config = configs[k, 1:]
         for i in range(n_max):
+            current_nb_par = nb_par[i, config[i], niobium_site]
             # A parallel
             if not np.isnan(a_par_data[i]):
                 err += a_par_weight * (a_par[i, config[i]] - a_par_data[i]) ** 2
             if (
-                np.isnan(nb_par[i, config[i]])
-                or np.abs(nb_par[i, config[i]] - nb_par_data[i]) > nb_tolerance
-            ):
+                np.isnan(current_nb_par)
+                or np.abs(current_nb_par - nb_par_data[i]) > nb_tolerance
+            ):  # current_nb_par can be nan if nb site and atom site are the same
                 err = np.inf
                 break
             # Nb couplings
             if not np.isnan(nb_par_data[i]):
-                err += nb_par_weight * (nb_par[i, config[i]] - nb_par_data[i]) ** 2
+                err += nb_par_weight * (current_nb_par - nb_par_data[i]) ** 2
             for j in range(i + 1, n_max):
                 # WW couplings
                 if all_couplings_index[i, j] != -1:
@@ -134,6 +136,7 @@ def compute_sites(
     WW_couplings_index,
     a_par,
     nb_par,
+    full_nb,
     tolerance,
     nb_tolerance,
     a_par_weight,
@@ -141,7 +144,7 @@ def compute_sites(
     cutoff,
     verbose=True,
 ):
-    n_placed = 1
+    n_placed = 0
     n_tot = couplings.shape[0]
     # Here size is the number of position in the displacment cube
     size = a_par.shape[1]
@@ -160,7 +163,7 @@ def compute_sites(
         ]
     )
     possible_configurations = np.array(
-        [[i] + [0] * (n_tot - 1) for i in range(size)],
+        [[i] + [0] * (n_tot) for i in range(size)],
         dtype=np.uint64,
     )
     print(WW_couplings.shape, a_par.shape, nb_par.shape, permutation)
@@ -170,17 +173,16 @@ def compute_sites(
     errors = np.zeros(size)
     argsort_error = np.arange(size)
     while n_placed < n_tot:
-        edge_spin = np.nanargmax(couplings[:n_placed, n_placed])
-
         if verbose:
             print(
-                f"Placing {n_placed} (linked to {edge_spin}). {len(possible_configurations)}*{len(WW_couplings)} cases to process."
+                f"Placing {n_placed}. {len(possible_configurations)}*{len(WW_couplings)} cases to process."
             )
         new_possible_configurations = compute_new_possible_config(
-            possible_configurations, size, n_tot, n_placed
+            possible_configurations, size, n_tot + 1, n_placed + 1
         )
         checkpoint = (
-            possible_configurations,
+            possible_configurations[:, 1:],
+            possible_configurations[:, 0],
             permutation,
             errors[argsort_error[: np.minimum(cutoff, inf_index)]],
             True,
@@ -212,7 +214,8 @@ def compute_sites(
         ].copy()
         n_placed += 1
     return (
-        possible_configurations,
+        possible_configurations[:, 1:],
+        possible_configurations[:, 0],
         permutation,
         errors[argsort_error[: np.minimum(cutoff, inf_index)]],
         False,
@@ -245,7 +248,14 @@ with h5py.File(couplings_file, "r") as f:
 
         n_tot = len(a_par_data)
         a_par = np.array([f[f"A_par_couplings/{i}"][:] for i in range(n_tot)])
-        nb_par = np.array([f[f"Nb_par_couplings/{i}"][:] for i in range(n_tot)])
+        if "Nb_par_couplings_full" in f.keys():
+            full_nb = True
+            nb_par = np.array(
+                [f[f"Nb_par_couplings_full/{i}"][:] for i in range(n_tot)]
+            )
+        else:
+            full_nb = False
+            nb_par = np.array([f[f"Nb_par_couplings/{i}"][:] for i in range(n_tot)])
 
         print("Allocating")
         size = a_par.shape[1]
@@ -266,7 +276,7 @@ with h5py.File(couplings_file, "r") as f:
                     )
                     k += 1
 
-        final_sites, permutation, errors, ended_prematurely = compute_sites(
+        final_sites, nb_sites, permutation, errors, ended_prematurely = compute_sites(
             renormalized_data[
                 np.meshgrid(selected_sites, selected_sites, indexing="ij")
             ],
@@ -278,6 +288,7 @@ with h5py.File(couplings_file, "r") as f:
             ],
             a_par=a_par[selected_sites],
             nb_par=nb_par[selected_sites],
+            full_nb=full_nb,
             tolerance=tolerance,
             nb_tolerance=nb_tolerance,
             a_par_weight=a_par_weight,
@@ -289,3 +300,4 @@ with h5py.File(couplings_file, "r") as f:
         g.create_dataset(name="sites", data=final_sites, dtype=np.uint64)
         g.create_dataset(name="permutation", data=permutation, dtype=np.uint64)
         g.create_dataset(name="errors", data=errors)
+        g.create_dataset(name="nb_sites", data=nb_sites)
