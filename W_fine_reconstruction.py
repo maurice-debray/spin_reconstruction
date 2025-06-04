@@ -58,7 +58,6 @@ def set_placing_order(couplings):
         next_index = np.nanargmax(np.abs(couplings[:i, i:])) % (n_tot - i) + i
         if next_index != i:
             exchange_columns(couplings, permutation, i, next_index)
-    exchange_columns(couplings, permutation, 7, 8)
     return couplings, permutation
 
 
