@@ -11,6 +11,7 @@ Functions:
   - :py:func:`index_to_coord` — Convert lattice index to (x, y, z, site).
   - :py:func:`compute_dr` — Map 3D index to real-space position
   - :py:func:`index_to_position` — Map lattice index to real-space position.
+  - :py:func:`exchange_columns` — Exchange spins indeces in a couplings matrix
 """
 
 import numpy as np
@@ -107,3 +108,50 @@ def index_to_position(i, max_distance):
     """
     c = index_to_coord(i, max_distance, site_nb)
     return c[0] * lattice_x + c[1] * lattice_y + c[2] * lattice_z + lattice_s[c[3]]
+
+
+@jit
+def exchange_columns(couplings, permutation, a, b):
+    """
+    Swap columns and corresponding rows ``a`` and ``b`` in a spin couplings matrix (similar to the one in ``spin_couplings.csv``). The operation is done in-place.
+
+    Also updates the `permutation` array to reflect the swap.
+
+    :param numpy.ndarray couplings: 2D square matrix of couplings.
+    :param numpy.ndarray permutation: 1D array tracking the current order of columns/rows.
+    :param int a: Index of the first column/row to swap.
+    :param int b: Index of the second column/row to swap.
+
+    :notes:
+        Only the upper triangle of the matrix is explicitly modified.
+    """
+
+    a, b = min(a, b), max(a, b)
+    permutation[a], permutation[b] = permutation[b], permutation[a]
+    for i in range(a):
+        couplings[i, a], couplings[i, b] = couplings[i, b], couplings[i, a]
+    for i in range(a + 1, b):
+        couplings[a, i], couplings[i, b] = couplings[i, b], couplings[a, i]
+    for i in range(b + 1, couplings.shape[0]):
+        couplings[a, i], couplings[b, i] = couplings[b, i], couplings[a, i]
+
+
+def set_placing_order(couplings):
+    """
+    Reorders a symmetric coupling matrix by iteratively swapping columns and rows
+    to place the largest remaining off-diagonal element at each step.
+
+    Also tracks the permutation applied to the columns/rows.
+
+    :param numpy.ndarray couplings: 2D square matrix of couplings to reorder.
+    :returns: Tuple containing the reordered coupling matrix and the final permutation array.
+    :rtype: tuple[numpy.ndarray, numpy.ndarray]
+    """
+
+    n_tot = couplings.shape[0]
+    permutation = np.arange(n_tot)
+    for i in range(1, n_tot):
+        next_index = np.nanargmax(np.abs(couplings[:i, i:])) % (n_tot - i) + i
+        if next_index != i:
+            exchange_columns(couplings, permutation, i, next_index)
+    return couplings, permutation
