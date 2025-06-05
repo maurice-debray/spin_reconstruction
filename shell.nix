@@ -25,10 +25,8 @@ pkgs.mkShell {
 
       ps.gitpython
 
-      ps.mkdocs
-      ps.mkdocs-material
-      ps.mkdocstrings
-      ps.mkdocstrings-python
+      ps.sphinx
+      ps.sphinx-rtd-theme
     ]))
 
     pkgs.vale
