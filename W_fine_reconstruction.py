@@ -8,11 +8,12 @@ import os.path
 
 import h5py
 import numpy as np
-from numba import jit, prange
 
-from constants import gamma_ratio
 from gitlock import get_commit_hash, get_config
 from measurement_data import a_par_data, nb_par_data, renormalized_data
+from spin_reconstruction.constants import gamma_ratio
+from spin_reconstruction.reconstruction import site_resolved_cost_with_nb
+from spin_reconstruction.utils import set_placing_order
 
 # In[2]:
 
@@ -34,98 +35,6 @@ selected_sites = get_config("fine_reconstruction", ["selected_sites"])
 
 if len(selected_sites) == 0:
     selected_sites = list(range(len(a_par_data)))
-
-
-@jit
-def exchange_columns(couplings, permutation, a, b):
-    a, b = min(a, b), max(a, b)
-    permutation[a], permutation[b] = permutation[b], permutation[a]
-    for i in range(a):
-        couplings[i, a], couplings[i, b] = couplings[i, b], couplings[i, a]
-    for i in range(a + 1, b):
-        couplings[a, i], couplings[i, b] = couplings[i, b], couplings[a, i]
-    for i in range(b + 1, couplings.shape[0]):
-        couplings[a, i], couplings[b, i] = couplings[b, i], couplings[a, i]
-
-
-def set_placing_order(couplings):
-    """
-    First spin will always be niobium. Then we sort all other spins
-    """
-    n_tot = couplings.shape[0]
-    permutation = np.arange(n_tot)
-    for i in range(1, n_tot):
-        next_index = np.nanargmax(np.abs(couplings[:i, i:])) % (n_tot - i) + i
-        if next_index != i:
-            exchange_columns(couplings, permutation, i, next_index)
-    return couplings, permutation
-
-
-@jit(parallel=True)
-def compute_new_possible_config(possible_configurations, size, len_config, n_placed):
-    new_possible_configurations = np.zeros(
-        (len(possible_configurations) * size, len_config), dtype=np.uint64
-    )
-    for c in prange(len(possible_configurations)):
-        config = possible_configurations[c]
-        # Get candidates
-        for site in prange(size):
-            for i in prange(n_placed + 1):
-                new_possible_configurations[c * size + site, i] = config[i]
-            new_possible_configurations[c * size + site, n_placed] = site
-    return new_possible_configurations
-
-
-@jit(parallel=True)
-def all_error_cost(
-    configs,
-    coupl,
-    a_par_data,
-    nb_par_data,
-    n_max,
-    all_couplings_index,
-    all_couplings,
-    a_par,
-    nb_par,
-    a_par_weight,
-    nb_par_weight,
-    tolerance,
-    nb_tolerance,
-):
-    errors = np.zeros(len(configs))
-    for k in prange(len(configs)):
-        err = 0.0
-        niobium_site = configs[k, 0]
-        config = configs[k, 1:]
-        for i in range(n_max):
-            current_nb_par = nb_par[i, config[i], niobium_site]
-            # A parallel
-            if not np.isnan(a_par_data[i]):
-                err += a_par_weight * (a_par[i, config[i]] - a_par_data[i]) ** 2
-            if (
-                np.isnan(current_nb_par)
-                or np.abs(current_nb_par - nb_par_data[i]) > nb_tolerance
-            ):  # current_nb_par can be nan if nb site and atom site are the same
-                err = np.inf
-                break
-            # Nb couplings
-            if not np.isnan(nb_par_data[i]):
-                err += nb_par_weight * (current_nb_par - nb_par_data[i]) ** 2
-            for j in range(i + 1, n_max):
-                # WW couplings
-                if all_couplings_index[i, j] != -1:
-                    coupling = all_couplings[
-                        all_couplings_index[i, j], config[i], config[j]
-                    ]
-                    if np.isnan(coupling) or np.abs(coupling - coupl[i, j]) > tolerance:
-                        err = np.inf
-                        break
-                    if not np.isnan(coupl[i, j]):
-                        err += (coupl[i, j] - coupling) ** 2
-            if err == np.inf:
-                break
-        errors[k] = err
-    return errors
 
 
 def compute_sites(
@@ -187,7 +96,7 @@ def compute_sites(
             errors[argsort_error[: np.minimum(cutoff, inf_index)]],
             True,
         )
-        errors = all_error_cost(
+        errors = site_resolved_cost_with_nb(
             new_possible_configurations,
             couplings,
             a_par_data,
@@ -247,21 +156,28 @@ with h5py.File(couplings_file, "r") as f:
         g.attrs["selected_sites"] = selected_sites
 
         n_tot = len(a_par_data)
-        a_par = np.array([f[f"A_par_couplings/{i}"][:] for i in range(n_tot)])
+        a_par = np.array([np.array(f[f"A_par_couplings/{i}"]) for i in range(n_tot)])
         if "Nb_par_couplings_full" in f.keys():
             full_nb = True
             nb_par = np.array(
-                [f[f"Nb_par_couplings_full/{i}"][:] for i in range(n_tot)]
+                [np.array(f[f"Nb_par_couplings_full/{i}"]) for i in range(n_tot)]
             )
         else:
             full_nb = False
-            nb_par = np.array([f[f"Nb_par_couplings/{i}"][:] for i in range(n_tot)])
+            nb_par = np.array(
+                [np.array(f[f"Nb_par_couplings/{i}"]) for i in range(n_tot)]
+            )
 
         print("Allocating")
         size = a_par.shape[1]
         print(n_tot, size)
         WW_couplings_index = np.full((n_tot, n_tot), -1, dtype=np.int64)
-        WW_couplings = np.empty((len(f["/SEDOR_couplings"].keys()), size, size))
+        s = f["/SEDOR_couplings"]
+        if isinstance(s, h5py.Group):
+            sedor_dataset = s
+        else:
+            raise ValueError("")
+        WW_couplings = np.empty((len(sedor_dataset.keys()), size, size))
 
         print("Allocated")
 
