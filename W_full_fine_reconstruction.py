@@ -12,8 +12,7 @@ import numpy as np
 from gitlock import get_commit_hash, get_config
 from measurement_data import a_par_data, nb_par_data, renormalized_data
 from spin_reconstruction.constants import gamma_ratio
-from spin_reconstruction.reconstruction import (compute_new_possible_config,
-                                                site_resolved_cost)
+from spin_reconstruction.reconstruction import site_resolved_cost_with_nb
 from spin_reconstruction.utils import set_placing_order
 
 # In[2]:
@@ -46,6 +45,7 @@ def compute_sites(
     WW_couplings_index,
     a_par,
     nb_par,
+    full_nb,
     tolerance,
     nb_tolerance,
     a_par_weight,
@@ -53,7 +53,7 @@ def compute_sites(
     cutoff,
     verbose=True,
 ):
-    n_placed = 1
+    n_placed = 0
     n_tot = couplings.shape[0]
     # Here size is the number of position in the displacment cube
     size = a_par.shape[1]
@@ -72,7 +72,7 @@ def compute_sites(
         ]
     )
     possible_configurations = np.array(
-        [[i] + [0] * (n_tot - 1) for i in range(size)],
+        [[i] + [0] * (n_tot) for i in range(size)],
         dtype=np.uint64,
     )
     print(WW_couplings.shape, a_par.shape, nb_par.shape, permutation)
@@ -87,15 +87,16 @@ def compute_sites(
                 f"Placing {n_placed}. {len(possible_configurations)}*{len(WW_couplings)} cases to process."
             )
         new_possible_configurations = compute_new_possible_config(
-            possible_configurations, size, n_tot, n_placed
+            possible_configurations, size, n_tot + 1, n_placed + 1
         )
         checkpoint = (
-            possible_configurations,
+            possible_configurations[:, 1:],
+            possible_configurations[:, 0],
             permutation,
             errors[argsort_error[: np.minimum(cutoff, inf_index)]],
             True,
         )
-        errors = site_resolved_cost(
+        errors = site_resolved_cost_with_nb(
             new_possible_configurations,
             couplings,
             a_par_data,
@@ -122,7 +123,8 @@ def compute_sites(
         ].copy()
         n_placed += 1
     return (
-        possible_configurations,
+        possible_configurations[:, 1:],
+        possible_configurations[:, 0],
         permutation,
         errors[argsort_error[: np.minimum(cutoff, inf_index)]],
         False,
@@ -155,7 +157,16 @@ with h5py.File(couplings_file, "r") as f:
 
         n_tot = len(a_par_data)
         a_par = np.array([np.array(f[f"A_par_couplings/{i}"]) for i in range(n_tot)])
-        nb_par = np.array([np.array(f[f"Nb_par_couplings/{i}"]) for i in range(n_tot)])
+        if "Nb_par_couplings_full" in f.keys():
+            full_nb = True
+            nb_par = np.array(
+                [np.array(f[f"Nb_par_couplings_full/{i}"]) for i in range(n_tot)]
+            )
+        else:
+            full_nb = False
+            nb_par = np.array(
+                [np.array(f[f"Nb_par_couplings/{i}"]) for i in range(n_tot)]
+            )
 
         print("Allocating")
         size = a_par.shape[1]
@@ -181,7 +192,7 @@ with h5py.File(couplings_file, "r") as f:
                     )
                     k += 1
 
-        final_sites, permutation, errors, ended_prematurely = compute_sites(
+        final_sites, nb_sites, permutation, errors, ended_prematurely = compute_sites(
             renormalized_data[
                 np.meshgrid(selected_sites, selected_sites, indexing="ij")
             ],
@@ -193,6 +204,7 @@ with h5py.File(couplings_file, "r") as f:
             ],
             a_par=a_par[selected_sites],
             nb_par=nb_par[selected_sites],
+            full_nb=full_nb,
             tolerance=tolerance,
             nb_tolerance=nb_tolerance,
             a_par_weight=a_par_weight,
@@ -204,3 +216,4 @@ with h5py.File(couplings_file, "r") as f:
         g.create_dataset(name="sites", data=final_sites, dtype=np.uint64)
         g.create_dataset(name="permutation", data=permutation, dtype=np.uint64)
         g.create_dataset(name="errors", data=errors)
+        g.create_dataset(name="nb_sites", data=nb_sites)
