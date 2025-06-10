@@ -135,6 +135,7 @@ with h5py.File(couplings_file, "r") as f:
         mdata.create_dataset(name="WW_couplings", data=renormalized_data)
         mdata.create_dataset(name="A_par_couplings", data=a_par_data)
         g.attrs["cutoff"] = cutoff
+        g.attrs["sigma"] = sigma
         g.attrs["git_commit"] = git_commit
         g.attrs["tolerance"] = tolerance
         g.attrs["nb_tolerance"] = nb_tolerance
