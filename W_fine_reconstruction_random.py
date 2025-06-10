@@ -222,4 +222,5 @@ with h5py.File(couplings_file, "r") as f:
             all_premature_end[i] = ended_prematurely
         g.create_dataset("partial_solution", data=all_premature_end)
         g.create_dataset("permutation", data=permutation)
+        g.create_dataset("errors", data=all_errors)
         g.create_dataset(name="sites", data=all_sites, dtype=np.uint64)
