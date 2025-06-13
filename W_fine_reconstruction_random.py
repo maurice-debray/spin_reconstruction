@@ -60,8 +60,15 @@ def compute_sites(
     n_tot = couplings.shape[0]
     # Here size is the number of position in the displacment cube
     size = a_par.shape[1]
+    s = round(size ** (1 / 3))
+    if s**3 != size:
+        raise ValueError("")
     possible_configurations = np.array(
-        [[i] + [0] * (n_tot - 1) for i in range(size)],
+        [
+            [i + j * s**2 + s * (s // 2)] + [0] * (n_tot - 1)
+            for j in range(s)
+            for i in range(s)
+        ],
         dtype=np.uint64,
     )
     print(WW_couplings.shape, a_par.shape, nb_par.shape)
