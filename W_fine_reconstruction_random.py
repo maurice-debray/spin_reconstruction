@@ -10,7 +10,8 @@ import h5py
 import numpy as np
 
 from gitlock import get_commit_hash, get_config
-from measurement_data import a_par_data, nb_par_data, renormalized_data
+from measurement_data import (WW_sigma, a_par_data, nb_par_data,
+                              renormalized_data)
 from spin_reconstruction.constants import gamma_ratio
 from spin_reconstruction.reconstruction import (compute_new_possible_config,
                                                 site_resolved_cost)
@@ -35,7 +36,6 @@ couplings_file = get_config("fine_reconstruction_random", ["couplings_file"])
 selected_sites = get_config("fine_reconstruction_random", ["selected_sites"])
 
 num_averages = get_config("fine_reconstruction_random", ["random", "length"])
-sigma = get_config("fine_reconstruction_random", ["random", "sigma"])
 
 if len(selected_sites) == 0:
     selected_sites = list(range(len(a_par_data)))
@@ -135,7 +135,7 @@ with h5py.File(couplings_file, "r") as f:
         mdata.create_dataset(name="WW_couplings", data=renormalized_data)
         mdata.create_dataset(name="A_par_couplings", data=a_par_data)
         g.attrs["cutoff"] = cutoff
-        g.attrs["sigma"] = sigma
+        g.attrs["WW_sigma"] = WW_sigma
         g.attrs["git_commit"] = git_commit
         g.attrs["tolerance"] = tolerance
         g.attrs["nb_tolerance"] = nb_tolerance
@@ -196,12 +196,12 @@ with h5py.File(couplings_file, "r") as f:
 
         for i in range(num_averages):
             renormalized_data_rand = renormalized_data_permuted + np.random.normal(
-                scale=sigma, size=renormalized_data_permuted.shape
+                scale=WW_sigma, size=renormalized_data_permuted.shape
             )
             a_par_data_rand = a_par_data_permuted  # Do not randomize for now + np.random.normal(size = a_par_data_permuted.shape)
             nb_par_data_rand = nb_par_data_permuted + np.random.normal(
                 size=nb_par_data_permuted.shape,
-                scale=sigma / gamma_ratio,
+                scale=0.01 / gamma_ratio,
             )
             final_sites, permutation, errors, ended_prematurely = compute_sites(
                 renormalized_data_rand,

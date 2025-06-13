@@ -1,6 +1,5 @@
 import numpy as np
 
-
 csv_data = np.genfromtxt("spin_couplings.csv", delimiter=",", filling_values=np.nan)
 raw_data = csv_data[2:, 2:]
 
@@ -17,3 +16,6 @@ a_par_data = (
 )  # A parallel in Hz (in fact it is not exactly that but isok)
 
 data_header = csv_data[0, 1:]
+
+all_sigma = np.genfromtxt("spin_couplings.csv", delimiter=",", filling_values=np.nan)
+WW_sigma = all_sigma[2:, 2:]
