@@ -17,5 +17,10 @@ a_par_data = (
 
 data_header = csv_data[0, 1:]
 
-all_sigma = np.genfromtxt("spin_couplings.csv", delimiter=",", filling_values=np.nan)
-WW_sigma = all_sigma[2:, 2:]
+all_sigma = np.genfromtxt(
+    "spin_couplings_std.csv", delimiter=",", filling_values=np.nan
+)
+# Replace nans with 1. we don't care but np.random.normal wants everything above 0
+WW_sigma = np.nan_to_num(all_sigma[2:, 2:], nan=1.0)
+
+print(WW_sigma)

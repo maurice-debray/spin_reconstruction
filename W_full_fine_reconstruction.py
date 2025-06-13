@@ -21,17 +21,17 @@ from spin_reconstruction.utils import set_placing_order
 # In[3]:
 
 a_par_weight = np.array(
-    get_config("fine_reconstruction", ["cost", "a_par_reference"])
+    get_config("full_fine_reconstruction", ["cost", "a_par_reference"])
 ) ** (-2)
-tolerance = get_config("fine_reconstruction", ["cost", "tolerance"])
+tolerance = get_config("full_fine_reconstruction", ["cost", "tolerance"])
 nb_par_weight = gamma_ratio**2
 nb_tolerance = tolerance / gamma_ratio
-cutoff = get_config("fine_reconstruction", ["cost", "cutoff"])
+cutoff = get_config("full_fine_reconstruction", ["cost", "cutoff"])
 
-file = get_config("fine_reconstruction", ["filename"])
-couplings_file = get_config("fine_reconstruction", ["couplings_file"])
+file = get_config("full_fine_reconstruction", ["filename"])
+couplings_file = get_config("full_fine_reconstruction", ["couplings_file"])
 
-selected_sites = get_config("fine_reconstruction", ["selected_sites"])
+selected_sites = get_config("full_fine_reconstruction", ["selected_sites"])
 
 if len(selected_sites) == 0:
     selected_sites = list(range(len(a_par_data)))
