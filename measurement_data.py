@@ -20,7 +20,6 @@ data_header = csv_data[0, 1:]
 all_sigma = np.genfromtxt(
     "spin_couplings_std.csv", delimiter=",", filling_values=np.nan
 )
-# Replace nans with 1. we don't care but np.random.normal wants everything above 0
-WW_sigma = np.nan_to_num(all_sigma[2:, 2:], nan=1.0)
-
-print(WW_sigma)
+# Replace nans with 0. we don't care but np.random.normal wants everything above 0
+WW_sigma = np.nan_to_num(all_sigma[2:, 2:]) * 2
+Nb_sigma = np.nan_to_num(all_sigma[1, 2:]) * 2

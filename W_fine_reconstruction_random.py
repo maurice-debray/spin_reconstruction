@@ -8,19 +8,15 @@ import os.path
 
 import h5py
 import numpy as np
+from tqdm import trange
 
 from gitlock import get_commit_hash, get_config
-from measurement_data import (WW_sigma, a_par_data, nb_par_data,
+from measurement_data import (Nb_sigma, WW_sigma, a_par_data, nb_par_data,
                               renormalized_data)
 from spin_reconstruction.constants import gamma_ratio
 from spin_reconstruction.reconstruction import (compute_new_possible_config,
                                                 site_resolved_cost)
 from spin_reconstruction.utils import set_placing_order
-
-# In[2]:
-
-
-# In[3]:
 
 a_par_weight = np.array(
     get_config("fine_reconstruction_random", ["cost", "a_par_reference"])
@@ -71,17 +67,12 @@ def compute_sites(
         ],
         dtype=np.uint64,
     )
-    print(WW_couplings.shape, a_par.shape, nb_par.shape)
 
     # initialize some reconstruction
     inf_index: np.intp = size
     errors = np.zeros(size)
     argsort_error = np.arange(size)
     while n_placed < n_tot:
-        if verbose:
-            print(
-                f"Placing {n_placed}. {len(possible_configurations)}*{len(WW_couplings)} cases to process."
-            )
         new_possible_configurations = compute_new_possible_config(
             possible_configurations, size, n_tot, n_placed
         )
@@ -154,9 +145,7 @@ with h5py.File(couplings_file, "r") as f:
         a_par = np.array([np.array(f[f"A_par_couplings/{i}"]) for i in range(n_tot)])
         nb_par = np.array([np.array(f[f"Nb_par_couplings/{i}"]) for i in range(n_tot)])
 
-        print("Allocating")
         size = a_par.shape[1]
-        print(n_tot, size)
         WW_couplings_index = np.full((n_tot, n_tot), -1, dtype=np.int64)
         s = f["/SEDOR_couplings"]
         if isinstance(s, h5py.Group):
@@ -164,8 +153,6 @@ with h5py.File(couplings_file, "r") as f:
         else:
             raise ValueError("")
         WW_couplings = np.empty((len(sedor_dataset.keys()), size, size))
-
-        print("Allocated")
 
         k = 0
         # TODO Improve this: It can be done with a single loop over the hdf5 keys
@@ -201,14 +188,14 @@ with h5py.File(couplings_file, "r") as f:
         all_errors = np.empty(num_averages)
         all_premature_end = np.empty(num_averages, dtype=bool)
 
-        for i in range(num_averages):
+        for i in trange(num_averages):
             renormalized_data_rand = renormalized_data_permuted + np.random.normal(
                 scale=WW_sigma, size=renormalized_data_permuted.shape
             )
             a_par_data_rand = a_par_data_permuted  # Do not randomize for now + np.random.normal(size = a_par_data_permuted.shape)
             nb_par_data_rand = nb_par_data_permuted + np.random.normal(
+                scale=Nb_sigma,
                 size=nb_par_data_permuted.shape,
-                scale=0.01 / gamma_ratio,
             )
             final_sites, permutation, errors, ended_prematurely = compute_sites(
                 renormalized_data_rand,
