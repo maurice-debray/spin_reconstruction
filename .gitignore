@@ -1,5 +1,7 @@
 .ipynb_checkpoints
 *.gif
+*.mp4
+*.svg
 *.hdf5
 __pycache__/
 *.conf.toml
