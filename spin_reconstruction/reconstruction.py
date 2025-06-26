@@ -78,6 +78,66 @@ def cost(
 
 
 @jit(parallel=True)
+def cost_full_nb(
+    configs,
+    sedor_data,
+    a_par_data,
+    nb_par_data,
+    n_max,
+    all_couplings,
+    a_par,
+    nb_par_full,
+    a_par_weight,
+    nb_par_weight,
+    tolerance,
+    nb_tolerance,
+):
+    """
+    Cost function where all spins share the same pool of sites
+    """
+    errors = np.zeros(len(configs))
+    for k in prange(len(configs)):
+        err = 0.0
+        config = configs[k]
+        for i in range(1, n_max):
+            # A parallel
+            if not np.isnan(a_par_data[i - 1]):
+                err += a_par_weight * (a_par[config[i]] - a_par_data[i - 1]) ** 2
+            if (
+                np.isnan(nb_par_full[config[i], config[0]])
+                or np.abs(nb_par_full[config[i], config[0]] - nb_par_data[i - 1])
+                > nb_tolerance
+            ):
+                err = np.inf
+                break
+            # Nb couplings
+            if not np.isnan(nb_par_data[i - 1]):
+                err += (
+                    nb_par_weight
+                    * (nb_par_full[config[i], config[0]] - nb_par_data[i - 1]) ** 2
+                )
+            for j in range(i + 1, n_max):
+                # WW couplings
+                if (
+                    np.isnan(all_couplings[config[i], config[j]])
+                    or np.abs(
+                        all_couplings[config[i], config[j]] - sedor_data[i - 1, j - 1]
+                    )
+                    > tolerance
+                ):
+                    err = np.inf
+                    break
+                if not np.isnan(sedor_data[i - 1, j - 1]):
+                    err += (
+                        sedor_data[i - 1, j - 1] - all_couplings[config[i], config[j]]
+                    ) ** 2
+            if err == np.inf:
+                break
+        errors[k] = err
+    return errors
+
+
+@jit(parallel=True)
 def site_resolved_cost(
     configs,
     coupl,

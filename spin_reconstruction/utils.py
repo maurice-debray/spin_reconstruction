@@ -137,7 +137,7 @@ def exchange_columns(couplings, permutation, a, b):
         couplings[a, i], couplings[b, i] = couplings[b, i], couplings[a, i]
 
 
-def set_placing_order(couplings):
+def set_placing_order(couplings, first=0):
     """
     Reorders a symmetric coupling matrix by iteratively swapping columns and rows
     to place the largest remaining off-diagonal element at each step.
@@ -151,6 +151,9 @@ def set_placing_order(couplings):
 
     n_tot = couplings.shape[0]
     permutation = np.arange(n_tot)
+    if first != 0:
+        exchange_columns(couplings, permutation, 0, first)
+
     for i in range(1, n_tot):
         next_index = np.nanargmax(np.abs(couplings[:i, i:])) % (n_tot - i) + i
         if next_index != i:
