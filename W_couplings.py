@@ -38,7 +38,7 @@ from spin_reconstruction.constants import (erbium_gamma, erbium_position,
                                            gamma_w, lattice_s, lattice_x,
                                            lattice_y, lattice_z, omega_I,
                                            omega_S)
-from spin_reconstruction.couplings import all_couplings
+from spin_reconstruction.couplings import all_couplings, full_nb_couplings
 
 x_start = get_config("couplings", ["range", "x_start"])
 y_start = get_config("couplings", ["range", "y_start"])
@@ -99,10 +99,13 @@ if __name__ == "__main__":
                     max_distance=max_distance, B=B_0
                 )
 
+                full_nb = full_nb_couplings(max_distance, B_0)
+
                 g = f.create_group(grp_name)
                 g.create_dataset(name="SEDOR_couplings", data=WW_couplings)
                 g.create_dataset(name="A_par_couplings", data=a_parallel)
                 g.create_dataset(name="NB_couplings", data=nb_par)
+                g.create_dataset(name="NB_couplings_full", data=full_nb)
 
                 attrs = {
                     "B": B_0,

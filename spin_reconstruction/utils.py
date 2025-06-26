@@ -94,6 +94,7 @@ def origin_index(size):
     return (size**2) * center + size * center + center
 
 
+@jit
 def index_to_position(i, max_distance):
     """
     Map a lattice index to a 3D position vector in physical space.
