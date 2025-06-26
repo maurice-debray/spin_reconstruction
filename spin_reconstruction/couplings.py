@@ -3,7 +3,7 @@ from numba import jit, prange
 
 from .constants import gamma_ratio, site_nb
 from .hamiltonian import nuclei_nuclei_coupling, tungsten_erbium_coupling
-from .utils import index_to_coord, index_to_position
+from .utils import coord_to_index, index_to_coord, index_to_position
 
 
 # TODO: Rename to stick to convention of not using abbreviations for spin names
@@ -33,7 +33,12 @@ def nb_couplings(max_distance, B):
             nb_par[i] = np.nan
         else:
             nb_par[i] = nuclei_nuclei_coupling(
-                index_to_position(i, max_distance), (0, 0, 0, 0), B, 1 / gamma_ratio
+                index_to_position(i, max_distance),
+                index_to_position(
+                    coord_to_index((0, 0, 0, 0), max_distance, site_nb), max_distance
+                ),
+                B,
+                1 / gamma_ratio,
             )
 
     return nb_par
